@@ -1,6 +1,6 @@
-echo pandas==1.5.3 > requirements.txt
-echo numpy==1.23.5 >> requirements.txt
-echo matplotlib==3.7.1 >> requirements.txt
-echo seaborn==0.12.2 >> requirements.txt
-echo scikit-learn==1.2.2 >> requirements.txt
-echo streamlit==1.25.0 >> requirements.txt
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+streamlit
