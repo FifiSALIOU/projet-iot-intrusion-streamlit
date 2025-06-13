@@ -1,16 +1,30 @@
-# train_model.py
+# ===========================================
+# SCRIPT D'ENTRAÎNEMENT POUR DÉPLOIEMENT
+# ===========================================
 
-import numpy as np
+print("🔄 Démarrage de l'entraînement des modèles...")
+
+# 1. IMPORTS
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+import numpy as np
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score
 import pickle
+import warnings
+warnings.filterwarnings('ignore')
 
-# Génération des données (mêmes règles que dans ton projet original)
+print("✅ Bibliothèques chargées avec succès!")
+
+# 2. GÉNÉRATION DU DATASET
+print("\n🔍 Génération des données d'entraînement...")
 np.random.seed(42)
 n_samples = 5000
 
+# Features pour simulation d'un réseau IoT
 data = {
     'packet_size': np.random.normal(512, 200, n_samples),
     'duration': np.random.exponential(2, n_samples),
@@ -34,9 +48,10 @@ data = {
     'dst_host_count': np.random.randint(1, 255, n_samples)
 }
 
+# Création du DataFrame
 df = pd.DataFrame(data)
 
-# Génération de la target
+# Création de la variable cible
 target = []
 for i in range(n_samples):
     score = 0
@@ -51,23 +66,120 @@ for i in range(n_samples):
 
 df['target'] = target
 
+print(f"✅ Dataset créé: {df.shape[0]} lignes, {df.shape[1]} colonnes")
+print(f"📊 Distribution: Normal={sum(df['target']==0)}, Anomalie={sum(df['target']==1)}")
+
+# 3. PRÉPARATION DES DONNÉES
+print("\n🔧 Préparation des données...")
 X = df.drop('target', axis=1)
 y = df['target']
 
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Normalisation
 scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_scaled, y)
+print(f"✅ Données préparées: Train={X_train_scaled.shape}, Test={X_test_scaled.shape}")
 
-# Sauvegarde du modèle et du scaler
+# 4. ENTRAÎNEMENT DES MODÈLES
+print("\n🤖 Entraînement des modèles...")
+
+models = {
+    'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    'SVM': SVC(kernel='rbf', random_state=42, probability=True),
+    'Logistic Regression': LogisticRegression(random_state=42, max_iter=1000)
+}
+
+best_model = None
+best_score = 0
+best_name = ""
+
+for name, model in models.items():
+    print(f"🔄 Entraînement: {name}")
+    model.fit(X_train_scaled, y_train)
+    y_pred = model.predict(X_test_scaled)
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"   ✅ Précision: {accuracy:.4f}")
+    
+    if accuracy > best_score:
+        best_score = accuracy
+        best_model = model
+        best_name = name
+
+print(f"\n🏆 Meilleur modèle: {best_name} (Précision: {best_score:.4f})")
+
+# 5. OPTIMISATION DU MEILLEUR MODÈLE
+print(f"\n⚡ Optimisation de {best_name}...")
+
+if best_name == 'Random Forest':
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20],
+        'min_samples_split': [2, 5, 10]
+    }
+elif best_name == 'SVM':
+    param_grid = {
+        'C': [0.1, 1, 10],
+        'gamma': ['scale', 'auto', 0.1],
+        'kernel': ['rbf', 'linear']
+    }
+else:  # Logistic Regression
+    param_grid = {
+        'C': [0.1, 1, 10],
+        'penalty': ['l1', 'l2'],
+        'solver': ['liblinear', 'saga']
+    }
+
+# GridSearch
+grid_search = GridSearchCV(
+    best_model, param_grid, cv=3, scoring='accuracy', n_jobs=-1
+)
+grid_search.fit(X_train_scaled, y_train)
+
+# Modèle final optimisé
+final_model = grid_search.best_estimator_
+final_pred = final_model.predict(X_test_scaled)
+final_accuracy = accuracy_score(y_test, final_pred)
+
+print(f"✅ Optimisation terminée!")
+print(f"📈 Précision finale: {final_accuracy:.4f}")
+print(f"🔧 Meilleurs paramètres: {grid_search.best_params_}")
+
+# 6. SAUVEGARDE DES MODÈLES
+print("\n💾 Sauvegarde des modèles...")
+
+# Sauvegarde du modèle final
 with open("model.pkl", "wb") as f:
-    pickle.dump(model, f)
+    pickle.dump(final_model, f)
+print("✅ model.pkl sauvegardé")
 
+# Sauvegarde du scaler
 with open("scaler.pkl", "wb") as f:
     pickle.dump(scaler, f)
+print("✅ scaler.pkl sauvegardé")
 
+# Sauvegarde des noms des features
 with open("features.pkl", "wb") as f:
-    pickle.dump(list(X.columns), f)
+    pickle.dump(X.columns.tolist(), f)
+print("✅ features.pkl sauvegardé")
 
-print("✅ Modèle, scaler et features sauvegardés.")
+# 7. RAPPORT FINAL
+print("\n" + "="*50)
+print("📋 RAPPORT D'ENTRAÎNEMENT FINAL")
+print("="*50)
+print(f"🎯 Objectif: Classification d'intrusions IoT")
+print(f"📊 Dataset: {n_samples} échantillons, {X.shape[1]} features")
+print(f"🏆 Modèle sélectionné: {best_name}")
+print(f"📈 Précision finale: {final_accuracy:.4f}")
+print(f"🔧 Optimisation: GridSearchCV")
+print(f"💾 Fichiers générés: model.pkl, scaler.pkl, features.pkl")
+print("✅ Prêt pour le déploiement!")
+print("="*50)
+
+print("\n🎉 ENTRAÎNEMENT TERMINÉ AVEC SUCCÈS!")
+print("💡 Vous pouvez maintenant exécuter: streamlit run app.py")
