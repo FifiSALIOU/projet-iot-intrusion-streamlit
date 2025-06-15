@@ -12,19 +12,19 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import accuracy_score
 import pickle
 import warnings
 warnings.filterwarnings('ignore')
 
 print("✅ Bibliothèques chargées avec succès!")
 
-# 2. GÉNÉRATION DU DATASET
+# 2. GÉNÉRATION DU DATASET SYNTHÉTIQUE
 print("\n🔍 Génération des données d'entraînement...")
 np.random.seed(42)
 n_samples = 5000
 
-# Features pour simulation d'un réseau IoT
+# Données simulées du trafic réseau IoT
 data = {
     'packet_size': np.random.normal(512, 200, n_samples),
     'duration': np.random.exponential(2, n_samples),
@@ -51,7 +51,7 @@ data = {
 # Création du DataFrame
 df = pd.DataFrame(data)
 
-# Création de la variable cible
+# Génération de la variable cible (0 = normal, 1 = attaque)
 target = []
 for i in range(n_samples):
     score = 0
@@ -103,9 +103,8 @@ for name, model in models.items():
     model.fit(X_train_scaled, y_train)
     y_pred = model.predict(X_test_scaled)
     accuracy = accuracy_score(y_test, y_pred)
-    
     print(f"   ✅ Précision: {accuracy:.4f}")
-    
+
     if accuracy > best_score:
         best_score = accuracy
         best_model = model
@@ -113,7 +112,7 @@ for name, model in models.items():
 
 print(f"\n🏆 Meilleur modèle: {best_name} (Précision: {best_score:.4f})")
 
-# 5. OPTIMISATION DU MEILLEUR MODÈLE
+# 5. OPTIMISATION AVEC GRIDSEARCH
 print(f"\n⚡ Optimisation de {best_name}...")
 
 if best_name == 'Random Forest':
@@ -135,13 +134,13 @@ else:  # Logistic Regression
         'solver': ['liblinear', 'saga']
     }
 
-# GridSearch
+# GridSearchCV
 grid_search = GridSearchCV(
     best_model, param_grid, cv=3, scoring='accuracy', n_jobs=-1
 )
 grid_search.fit(X_train_scaled, y_train)
 
-# Modèle final optimisé
+# Meilleur modèle optimisé
 final_model = grid_search.best_estimator_
 final_pred = final_model.predict(X_test_scaled)
 final_accuracy = accuracy_score(y_test, final_pred)
@@ -153,17 +152,14 @@ print(f"🔧 Meilleurs paramètres: {grid_search.best_params_}")
 # 6. SAUVEGARDE DES MODÈLES
 print("\n💾 Sauvegarde des modèles...")
 
-# Sauvegarde du modèle final
 with open("model.pkl", "wb") as f:
     pickle.dump(final_model, f)
 print("✅ model.pkl sauvegardé")
 
-# Sauvegarde du scaler
 with open("scaler.pkl", "wb") as f:
     pickle.dump(scaler, f)
 print("✅ scaler.pkl sauvegardé")
 
-# Sauvegarde des noms des features
 with open("features.pkl", "wb") as f:
     pickle.dump(X.columns.tolist(), f)
 print("✅ features.pkl sauvegardé")
