@@ -1,81 +1,92 @@
 # ===========================================
-# SCRIPT D'ENTRAÎNEMENT POUR DÉPLOIEMENT
+# SCRIPT D'ENTRAÎNEMENT AVEC VRAI DATASET N-BaIoT
 # ===========================================
 
-print("🔄 Démarrage de l'entraînement des modèles...")
+print("🔄 Démarrage de l'entraînement des modèles avec le dataset N-BaIoT...")
 
 # 1. IMPORTS
 import pandas as pd
 import numpy as np
+import os
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 import pickle
 import warnings
+import zipfile
+from urllib.request import urlretrieve
 warnings.filterwarnings('ignore')
 
-print("✅ Bibliothèques chargées avec succès!")
+# 2. TÉLÉCHARGEMENT ET PRÉTRAITEMENT DU DATASET
+print("\n🔍 Téléchargement et prétraitement du dataset N-BaIoT...")
 
-# 2. GÉNÉRATION DU DATASET
-print("\n🔍 Génération des données d'entraînement...")
-np.random.seed(42)
-n_samples = 5000
+# URL du dataset
+DATASET_URL = "https://www.kaggle.com/datasets/mkashifn/nbaiot-Dataset"
+FILES = [
+    "1.benign.csv",
+    "4.mirai.scan.csv",
+    "4.mirai.ack.csv",
+    "4.mirai.syn.csv",
+    "4.mirai.udp.csv",
+    "4.mirai.udpplain.csv",
+    "4.gafgyt.combo.csv",
+    "4.gafgyt.junk.csv",
+    "4.gafgyt.scan.csv",
+    "4.gafgyt.tcp.csv",
+    "4.gafgyt.udp.csv"
+]
 
-# Features pour simulation d'un réseau IoT
-data = {
-    'packet_size': np.random.normal(512, 200, n_samples),
-    'duration': np.random.exponential(2, n_samples),
-    'src_bytes': np.random.normal(1024, 500, n_samples),
-    'dst_bytes': np.random.normal(768, 300, n_samples),
-    'protocol_tcp': np.random.choice([0, 1], n_samples, p=[0.4, 0.6]),
-    'protocol_udp': np.random.choice([0, 1], n_samples, p=[0.7, 0.3]),
-    'service_http': np.random.choice([0, 1], n_samples, p=[0.6, 0.4]),
-    'service_ftp': np.random.choice([0, 1], n_samples, p=[0.8, 0.2]),
-    'urgent': np.random.randint(0, 5, n_samples),
-    'hot': np.random.randint(0, 10, n_samples),
-    'num_failed_logins': np.random.randint(0, 5, n_samples),
-    'logged_in': np.random.choice([0, 1], n_samples, p=[0.3, 0.7]),
-    'num_compromised': np.random.randint(0, 3, n_samples),
-    'root_shell': np.random.choice([0, 1], n_samples, p=[0.9, 0.1]),
-    'su_attempted': np.random.choice([0, 1], n_samples, p=[0.95, 0.05]),
-    'num_root': np.random.randint(0, 5, n_samples),
-    'num_file_creations': np.random.randint(0, 10, n_samples),
-    'count': np.random.randint(1, 100, n_samples),
-    'srv_count': np.random.randint(1, 50, n_samples),
-    'dst_host_count': np.random.randint(1, 255, n_samples)
-}
+# Télécharger les fichiers
+# Vérification que les fichiers sont présents dans le même dossier que le script
+for file in FILES:
+    if not os.path.exists(file):
+        raise FileNotFoundError(f"❌ Le fichier {file} est introuvable dans le dossier courant. Place tous les fichiers CSV à côté de train_model.py.")
 
-# Création du DataFrame
-df = pd.DataFrame(data)
 
-# Création de la variable cible
-target = []
-for i in range(n_samples):
-    score = 0
-    if df.iloc[i]['num_failed_logins'] > 2: score += 2
-    if df.iloc[i]['root_shell'] == 1: score += 3
-    if df.iloc[i]['num_compromised'] > 0: score += 2
-    if df.iloc[i]['su_attempted'] == 1: score += 1
-    if df.iloc[i]['urgent'] > 2: score += 1
-    if df.iloc[i]['packet_size'] > 1000: score += 1
-    if np.random.random() < 0.1: score += np.random.randint(1, 3)
-    target.append(1 if score > 3 else 0)
 
-df['target'] = target
+# Charger et combiner les données
+dfs = []
+for file in FILES:
+    df = pd.read_csv(os.path.join(".", file))
+    # Ajouter une colonne 'label'
+    if "benign" in file:
+        df['label'] = 'benign'
+    else:
+        attack_type = file.split('.')[1]
+        df['label'] = attack_type
+    dfs.append(df)
 
-print(f"✅ Dataset créé: {df.shape[0]} lignes, {df.shape[1]} colonnes")
-print(f"📊 Distribution: Normal={sum(df['target']==0)}, Anomalie={sum(df['target']==1)}")
+full_df = pd.concat(dfs, ignore_index=True)
+print(f"✅ Dataset chargé: {full_df.shape[0]} lignes, {full_df.shape[1]} colonnes")
 
 # 3. PRÉPARATION DES DONNÉES
 print("\n🔧 Préparation des données...")
-X = df.drop('target', axis=1)
-y = df['target']
 
+# Sélection des features importantes (simplifié pour l'exemple)
+SELECTED_FEATURES = [
+    'MI_dir_L5_weight', 'MI_dir_L5_mean', 'MI_dir_L5_variance',
+    'MI_dir_L3_weight', 'MI_dir_L3_mean', 'MI_dir_L3_variance',
+    'MI_dir_L1_weight', 'MI_dir_L1_mean', 'MI_dir_L1_variance',
+    'MI_dir_L0.1_weight'
+]
+
+# Filtrer les features
+X = full_df[SELECTED_FEATURES]
+y = full_df['label']
+
+# Encoder les labels
+le = LabelEncoder()
+y_encoded = le.fit_transform(y)
+
+# Conversion binaire: 0 = benign, 1 = malicious
+y_binary = np.where(y_encoded == 0, 0, 1)
+
+# Division des données
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
+    X, y_binary, test_size=0.2, random_state=42, stratify=y_binary
 )
 
 # Normalisation
@@ -84,19 +95,19 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 print(f"✅ Données préparées: Train={X_train_scaled.shape}, Test={X_test_scaled.shape}")
+print(f"📊 Distribution: Normal={sum(y_binary==0)}, Anomalie={sum(y_binary==1)}")
 
 # 4. ENTRAÎNEMENT DES MODÈLES
 print("\n🤖 Entraînement des modèles...")
 
 models = {
-    'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    'Random Forest': RandomForestClassifier(random_state=42, n_jobs=-1),
     'SVM': SVC(kernel='rbf', random_state=42, probability=True),
     'Logistic Regression': LogisticRegression(random_state=42, max_iter=1000)
 }
 
-best_model = None
-best_score = 0
-best_name = ""
+# Stockage des modèles entraînés
+trained_models = {}
 
 for name, model in models.items():
     print(f"🔄 Entraînement: {name}")
@@ -105,58 +116,51 @@ for name, model in models.items():
     accuracy = accuracy_score(y_test, y_pred)
     
     print(f"   ✅ Précision: {accuracy:.4f}")
-    
-    if accuracy > best_score:
-        best_score = accuracy
-        best_model = model
-        best_name = name
+    trained_models[name] = model
 
-print(f"\n🏆 Meilleur modèle: {best_name} (Précision: {best_score:.4f})")
+# 5. OPTIMISATION DES MODÈLES
+print("\n⚡ Optimisation des modèles...")
 
-# 5. OPTIMISATION DU MEILLEUR MODÈLE
-print(f"\n⚡ Optimisation de {best_name}...")
-
-if best_name == 'Random Forest':
-    param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [None, 10, 20],
-        'min_samples_split': [2, 5, 10]
-    }
-elif best_name == 'SVM':
-    param_grid = {
+param_grids = {
+    'Random Forest': {
+        'n_estimators': [100, 200],
+        'max_depth': [None, 20],
+        'min_samples_split': [2, 5]
+    },
+    'SVM': {
         'C': [0.1, 1, 10],
-        'gamma': ['scale', 'auto', 0.1],
-        'kernel': ['rbf', 'linear']
-    }
-else:  # Logistic Regression
-    param_grid = {
+        'gamma': ['scale', 'auto']
+    },
+    'Logistic Regression': {
         'C': [0.1, 1, 10],
-        'penalty': ['l1', 'l2'],
-        'solver': ['liblinear', 'saga']
+        'penalty': ['l2']
     }
+}
 
-# GridSearch
-grid_search = GridSearchCV(
-    best_model, param_grid, cv=3, scoring='accuracy', n_jobs=-1
-)
-grid_search.fit(X_train_scaled, y_train)
+best_models = {}
 
-# Modèle final optimisé
-final_model = grid_search.best_estimator_
-final_pred = final_model.predict(X_test_scaled)
-final_accuracy = accuracy_score(y_test, final_pred)
-
-print(f"✅ Optimisation terminée!")
-print(f"📈 Précision finale: {final_accuracy:.4f}")
-print(f"🔧 Meilleurs paramètres: {grid_search.best_params_}")
+for name in trained_models:
+    print(f"🔧 Optimisation de {name}...")
+    grid_search = GridSearchCV(
+        trained_models[name], 
+        param_grids[name], 
+        cv=3, 
+        scoring='accuracy', 
+        n_jobs=-1
+    )
+    grid_search.fit(X_train_scaled, y_train)
+    best_models[name] = grid_search.best_estimator_
+    print(f"   ✅ Optimisation terminée! Précision: {grid_search.best_score_:.4f}")
+    print(f"   🔧 Meilleurs paramètres: {grid_search.best_params_}")
 
 # 6. SAUVEGARDE DES MODÈLES
 print("\n💾 Sauvegarde des modèles...")
 
-# Sauvegarde du modèle final
-with open("model.pkl", "wb") as f:
-    pickle.dump(final_model, f)
-print("✅ model.pkl sauvegardé")
+# Sauvegarde des modèles
+for name, model in best_models.items():
+    with open(f"{name.lower().replace(' ', '_')}_model.pkl", "wb") as f:
+        pickle.dump(model, f)
+    print(f"✅ {name} sauvegardé")
 
 # Sauvegarde du scaler
 with open("scaler.pkl", "wb") as f:
@@ -165,7 +169,7 @@ print("✅ scaler.pkl sauvegardé")
 
 # Sauvegarde des noms des features
 with open("features.pkl", "wb") as f:
-    pickle.dump(X.columns.tolist(), f)
+    pickle.dump(SELECTED_FEATURES, f)
 print("✅ features.pkl sauvegardé")
 
 # 7. RAPPORT FINAL
@@ -173,12 +177,21 @@ print("\n" + "="*50)
 print("📋 RAPPORT D'ENTRAÎNEMENT FINAL")
 print("="*50)
 print(f"🎯 Objectif: Classification d'intrusions IoT")
-print(f"📊 Dataset: {n_samples} échantillons, {X.shape[1]} features")
-print(f"🏆 Modèle sélectionné: {best_name}")
-print(f"📈 Précision finale: {final_accuracy:.4f}")
-print(f"🔧 Optimisation: GridSearchCV")
-print(f"💾 Fichiers générés: model.pkl, scaler.pkl, features.pkl")
-print("✅ Prêt pour le déploiement!")
+print(f"📊 Dataset: N-BaIoT ({full_df.shape[0]} échantillons)")
+print(f"📈 Features utilisées: {len(SELECTED_FEATURES)}")
+
+print("\n🏆 Performances des modèles (précision):")
+for name, model in best_models.items():
+    y_pred = model.predict(X_test_scaled)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"   - {name}: {accuracy:.4f}")
+
+print("\n💾 Fichiers générés:")
+print("   - random_forest_model.pkl")
+print("   - svm_model.pkl")
+print("   - logistic_regression_model.pkl")
+print("   - scaler.pkl")
+print("   - features.pkl")
 print("="*50)
 
 print("\n🎉 ENTRAÎNEMENT TERMINÉ AVEC SUCCÈS!")
