@@ -31,11 +31,6 @@ FILES = [
     "4.mirai.ack.csv",
     "4.mirai.syn.csv",
     "4.mirai.udp.csv",
-    "4.mirai.udpplain.csv",
-    "4.gafgyt.combo.csv",
-    "4.gafgyt.junk.csv",
-    "4.gafgyt.scan.csv",
-    "4.gafgyt.tcp.csv",
     "4.gafgyt.udp.csv"
 ]
 
