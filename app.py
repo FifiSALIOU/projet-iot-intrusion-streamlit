@@ -178,6 +178,8 @@ if models is not None:
             st.write("Exemple de fichier: [Télécharger un exemple](https://example.com/sample.csv)")
         
         uploaded_file = st.file_uploader("📁 Choisissez un fichier CSV", type="csv", key="batch_csv_uploader")
+    if uploaded_file is not None:
+        st.write(f"Taille du fichier uploadé : {uploaded_file.size / (1024*1024):.2f} Mo")
 
         
         if uploaded_file is not None:
