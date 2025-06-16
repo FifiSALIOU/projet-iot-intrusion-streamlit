@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
@@ -18,33 +19,72 @@ st.set_page_config(
 
 # Titre principal
 st.title("🔒 Système de Détection d'Intrusions Réseau IoT")
+st.markdown("""
+**Classifiez le trafic réseau comme normal ou malveillant**  
+Basé sur le dataset N-BaIoT (UCI Machine Learning Repository)
+""")
 st.markdown("---")
 
-# Fonction pour charger les modèles (avec gestion d'erreur)
+# Fonction pour charger les modèles
 @st.cache_resource
-def load_model_and_scaler():
+def load_models_and_scaler():
     try:
-        with open("model.pkl", "rb") as f:
-            model = pickle.load(f)
+        # Charger les 3 modèles
+        with open("random_forest_model.pkl", "rb") as f:
+            rf_model = pickle.load(f)
+        with open("svm_model.pkl", "rb") as f:
+            svm_model = pickle.load(f)
+        with open("logistic_regression_model.pkl", "rb") as f:
+            lr_model = pickle.load(f)
+        
+        # Charger le scaler et les features
         with open("scaler.pkl", "rb") as f:
             scaler = pickle.load(f)
         with open("features.pkl", "rb") as f:
             features = pickle.load(f)
-        return model, scaler, features
+            
+        return {
+            "Random Forest": rf_model,
+            "SVM": svm_model,
+            "Logistic Regression": lr_model
+        }, scaler, features
+        
     except FileNotFoundError:
         st.error("⚠️ Modèles non trouvés. Veuillez d'abord exécuter le script d'entraînement.")
         return None, None, None
 
 # Chargement des modèles
-model, scaler, features = load_model_and_scaler()
+models, scaler, features = load_models_and_scaler()
 
-if model is not None:
+if models is not None:
     # Sidebar pour la navigation
     st.sidebar.title("Navigation")
     option = st.sidebar.selectbox(
         "Choisissez une option:",
-        ["🔍 Prédiction Simple", "📊 Prédiction par Batch", "📈 Statistiques du Modèle"]
+        ["🔍 Prédiction Simple", "📊 Prédiction par Batch", "📈 Statistiques des Modèles"]
     )
+
+    # Liste des features N-BaIoT
+    N_BAIOT_FEATURES = [
+        'MI_dir_L5_weight', 'MI_dir_L5_mean', 'MI_dir_L5_variance',
+        'MI_dir_L3_weight', 'MI_dir_L3_mean', 'MI_dir_L3_variance',
+        'MI_dir_L1_weight', 'MI_dir_L1_mean', 'MI_dir_L1_variance',
+        'MI_dir_L0.1_weight'
+    ]
+
+    # Valeurs réalistes par défaut
+    DEFAULT_VALUES = {
+        'MI_dir_L5_weight': 0.35,
+        'MI_dir_L5_mean': 0.02,
+        'MI_dir_L5_variance': 0.001,
+        'MI_dir_L3_weight': 0.28,
+        'MI_dir_L3_mean': 0.015,
+        'MI_dir_L3_variance': 0.0008,
+        'MI_dir_L1_weight': 0.15,
+        'MI_dir_L1_mean': 0.01,
+        'MI_dir_L1_variance': 0.0005,
+        'MI_dir_L0.1_weight': 0.05
+    }
 
     if option == "🔍 Prédiction Simple":
         st.header("🔍 Prédiction pour un Échantillon")
@@ -53,51 +93,48 @@ if model is not None:
         # Création de colonnes pour l'interface
         col1, col2 = st.columns(2)
         
+        input_data = {}
+        
         with col1:
-            st.subheader("📡 Caractéristiques du Paquet")
-            packet_size = st.number_input("Taille du paquet", min_value=0.0, max_value=5000.0, value=512.0)
-            duration = st.number_input("Durée de connexion", min_value=0.0, max_value=100.0, value=2.0)
-            src_bytes = st.number_input("Bytes source", min_value=0.0, max_value=10000.0, value=1024.0)
-            dst_bytes = st.number_input("Bytes destination", min_value=0.0, max_value=10000.0, value=768.0)
-            
-            st.subheader("🌐 Protocoles")
-            protocol_tcp = st.selectbox("Protocole TCP", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
-            protocol_udp = st.selectbox("Protocole UDP", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
-            
+            st.subheader("📡 Caractéristiques du Trafic")
+            for i in range(5):
+                feat = N_BAIOT_FEATURES[i]
+                input_data[feat] = st.number_input(
+                    label=feat,
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=DEFAULT_VALUES[feat],
+                    step=0.01,
+                    format="%.4f"
+                )
+        
         with col2:
-            st.subheader("⚙️ Services")
-            service_http = st.selectbox("Service HTTP", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
-            service_ftp = st.selectbox("Service FTP", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
+            st.subheader("")
+            for i in range(5, len(N_BAIOT_FEATURES)):
+                feat = N_BAIOT_FEATURES[i]
+                input_data[feat] = st.number_input(
+                    label=feat,
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=DEFAULT_VALUES[feat],
+                    step=0.01,
+                    format="%.4f"
+                )
             
-            st.subheader("🔐 Sécurité")
-            num_failed_logins = st.number_input("Tentatives de connexion échouées", min_value=0, max_value=20, value=0)
-            logged_in = st.selectbox("Connecté", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
-            num_compromised = st.number_input("Conditions compromises", min_value=0, max_value=10, value=0)
-            root_shell = st.selectbox("Accès root shell", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
-            su_attempted = st.selectbox("Tentative su", [0, 1], format_func=lambda x: "Non" if x == 0 else "Oui")
-            
-        # Autres paramètres dans une section repliable
-        with st.expander("Paramètres Avancés"):
-            urgent = st.number_input("Urgence", min_value=0, max_value=10, value=0)
-            hot = st.number_input("Indicateur hot", min_value=0, max_value=20, value=0)
-            num_root = st.number_input("Accès root", min_value=0, max_value=10, value=0)
-            num_file_creations = st.number_input("Créations de fichiers", min_value=0, max_value=50, value=0)
-            count = st.number_input("Count", min_value=1, max_value=500, value=1)
-            srv_count = st.number_input("Service count", min_value=1, max_value=200, value=1)
-            dst_host_count = st.number_input("Destination host count", min_value=1, max_value=255, value=1)
+        # Sélection du modèle
+        selected_model = st.selectbox(
+            "Sélectionnez le modèle à utiliser:",
+            list(models.keys())
+        )
+        model = models[selected_model]
         
         # Bouton de prédiction
         if st.button("🔍 Analyser", type="primary"):
             # Création du vecteur de caractéristiques
-            input_data = np.array([[
-                packet_size, duration, src_bytes, dst_bytes, protocol_tcp, protocol_udp,
-                service_http, service_ftp, urgent, hot, num_failed_logins, logged_in,
-                num_compromised, root_shell, su_attempted, num_root, num_file_creations,
-                count, srv_count, dst_host_count
-            ]])
+            input_array = np.array([[input_data[feat] for feat in N_BAIOT_FEATURES]])
             
             # Normalisation
-            input_scaled = scaler.transform(input_data)
+            input_scaled = scaler.transform(input_array)
             
             # Prédiction
             prediction = model.predict(input_scaled)[0]
@@ -110,7 +147,7 @@ if model is not None:
             with col1:
                 if prediction == 1:
                     st.error("🚨 **INTRUSION DÉTECTÉE**")
-                    st.markdown("⚠️ Trafic suspect identifié")
+                    st.markdown("⚠️ Trafic malveillant identifié")
                 else:
                     st.success("✅ **TRAFIC NORMAL**")
                     st.markdown("🔒 Aucune menace détectée")
@@ -126,7 +163,7 @@ if model is not None:
                 colors = ['#2E8B57', '#DC143C']
                 ax.bar(labels, probability, color=colors, alpha=0.7)
                 ax.set_ylabel('Probabilité')
-                ax.set_title('Probabilités de Classification')
+                ax.set_title(f'Probabilités de Classification ({selected_model})')
                 ax.set_ylim(0, 1)
                 for i, v in enumerate(probability):
                     ax.text(i, v + 0.02, f'{v:.2%}', ha='center', va='bottom')
@@ -136,6 +173,12 @@ if model is not None:
         st.header("📊 Analyse de Fichier CSV")
         st.markdown("Uploadez un fichier CSV pour analyser plusieurs échantillons.")
         
+        # Information sur le format attendu
+        with st.expander("ℹ️ Format de fichier requis"):
+            st.write("Le fichier CSV doit contenir les colonnes suivantes:")
+            st.write(", ".join(N_BAIOT_FEATURES))
+            st.write("Exemple de fichier: [Télécharger un exemple](https://example.com/sample.csv)")
+        
         uploaded_file = st.file_uploader("Choisissez un fichier CSV", type="csv")
         
         if uploaded_file is not None:
@@ -143,15 +186,18 @@ if model is not None:
                 df = pd.read_csv(uploaded_file)
                 st.success(f"✅ Fichier chargé: {df.shape[0]} lignes, {df.shape[1]} colonnes")
                 
-                # Affichage des premières lignes
-                st.subheader("👀 Aperçu des données")
-                st.dataframe(df.head())
-                
                 # Vérification des colonnes
-                if set(features).issubset(set(df.columns)):
+                if set(N_BAIOT_FEATURES).issubset(set(df.columns)):
+                    # Sélection du modèle
+                    selected_model = st.selectbox(
+                        "Sélectionnez le modèle à utiliser:",
+                        list(models.keys())
+                    )
+                    model = models[selected_model]
+                    
                     if st.button("🔍 Analyser le fichier", type="primary"):
                         # Préparation des données
-                        X = df[features]
+                        X = df[N_BAIOT_FEATURES]
                         X_scaled = scaler.transform(X)
                         
                         # Prédictions
@@ -200,7 +246,7 @@ if model is not None:
                         
                         # Affichage des résultats détaillés
                         st.subheader("📋 Résultats Détaillés")
-                        st.dataframe(df[['Statut', 'Probabilité_Normal', 'Probabilité_Intrusion']])
+                        st.dataframe(df[['Statut', 'Probabilité_Normal', 'Probabilité_Intrusion'] + N_BAIOT_FEATURES])
                         
                         # Téléchargement des résultats
                         csv = df.to_csv(index=False)
@@ -213,64 +259,56 @@ if model is not None:
                         
                 else:
                     st.error("❌ Le fichier ne contient pas les colonnes requises.")
-                    st.write("Colonnes requises:", features)
+                    st.write("Colonnes requises:", N_BAIOT_FEATURES)
                     st.write("Colonnes trouvées:", list(df.columns))
                     
             except Exception as e:
                 st.error(f"❌ Erreur lors du chargement du fichier: {str(e)}")
 
-    elif option == "📈 Statistiques du Modèle":
-        st.header("📈 Informations sur le Modèle")
+    elif option == "📈 Statistiques des Modèles":
+        st.header("📈 Informations sur les Modèles")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("🤖 Détails du Modèle")
-            st.write(f"**Type de modèle:** {type(model).__name__}")
-            st.write(f"**Nombre de features:** {len(features)}")
+        # Afficher les statistiques pour chaque modèle
+        for model_name, model in models.items():
+            st.subheader(f"🤖 Modèle: {model_name}")
             
-            if hasattr(model, 'n_estimators'):
-                st.write(f"**Nombre d'estimateurs:** {model.n_estimators}")
-            if hasattr(model, 'max_depth'):
-                st.write(f"**Profondeur maximale:** {model.max_depth}")
-            if hasattr(model, 'C'):
-                st.write(f"**Paramètre C:** {model.C}")
-        
-        with col2:
-            st.subheader("📊 Features Utilisées")
-            features_df = pd.DataFrame({'Feature': features})
-            st.dataframe(features_df, use_container_width=True)
-        
-        # Importance des features (si disponible)
-        if hasattr(model, 'feature_importances_'):
-            st.subheader("🎯 Importance des Features")
+            col1, col2 = st.columns(2)
             
-            importance_df = pd.DataFrame({
-                'Feature': features,
-                'Importance': model.feature_importances_
-            }).sort_values('Importance', ascending=False)
+            with col1:
+                st.write(f"**Type de modèle:** {type(model).__name__}")
+                
+                # Afficher les paramètres spécifiques au modèle
+                if hasattr(model, 'get_params'):
+                    params = model.get_params()
+                    st.write("**Paramètres:**")
+                    for key, value in list(params.items())[:5]:  # Afficher les 5 premiers
+                        st.text(f"{key}: {value}")
             
-            fig, ax = plt.subplots(figsize=(10, 8))
-            sns.barplot(data=importance_df, x='Importance', y='Feature', ax=ax)
-            ax.set_title('Importance des Features')
-            st.pyplot(fig)
+            with col2:
+                # Importance des features (si disponible)
+                if hasattr(model, 'feature_importances_'):
+                    st.subheader("🎯 Importance des Features")
+                    
+                    importance_df = pd.DataFrame({
+                        'Feature': features,
+                        'Importance': model.feature_importances_
+                    }).sort_values('Importance', ascending=False)
+                    
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    sns.barplot(data=importance_df.head(10), x='Importance', y='Feature', ax=ax)
+                    ax.set_title('Top 10 des Features Importantes')
+                    st.pyplot(fig)
             
-            st.dataframe(importance_df)
+            st.markdown("---")
 
     # Sidebar avec informations supplémentaires
     st.sidebar.markdown("---")
     st.sidebar.markdown("### ℹ️ À Propos")
     st.sidebar.info(
         "Cette application utilise des techniques de Machine Learning "
-        "pour détecter les intrusions dans les réseaux IoT."
+        "pour détecter les intrusions dans les réseaux IoT basée sur le dataset N-BaIoT."
     )
     
-    st.sidebar.markdown("### 🔧 Paramètres du Modèle")
-    if hasattr(model, 'get_params'):
-        params = model.get_params()
-        for key, value in list(params.items())[:5]:  # Afficher seulement les 5 premiers
-            st.sidebar.text(f"{key}: {value}")
-
 else:
     st.error("⚠️ Impossible de charger les modèles. Assurez-vous d'avoir exécuté le script d'entraînement.")
-    st.info("💡 Exécutez d'abord votre notebook Kaggle pour générer les fichiers model.pkl, scaler.pkl et features.pkl")
+    st.info("💡 Exécutez d'abord le script train_model.py pour générer les fichiers nécessaires")
