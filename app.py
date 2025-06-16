@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 import warnings
+import os
 warnings.filterwarnings('ignore')
 
 # Configuration de la page
@@ -167,7 +168,7 @@ if models is not None:
                     ax.text(i, v + 0.02, f'{v:.2%}', ha='center', va='bottom')
                 st.pyplot(fig)
 
-     elif option == "📊 Prédiction par Batch":
+    elif option == "📊 Prédiction par Batch":
         st.header("📊 Analyse de Fichier CSV")
         st.markdown("Choisissez un fichier CSV local ou uploadez un fichier CSV pour analyser plusieurs échantillons.")
         
