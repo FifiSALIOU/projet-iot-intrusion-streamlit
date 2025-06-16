@@ -114,7 +114,6 @@ if models is not None:
                 input_data[feat] = st.number_input(
                     label=feat,
                     min_value=0.0,
-                    max_value=1.0,
                     value=DEFAULT_VALUES[feat],
                     step=0.01,
                     format="%.4f"
