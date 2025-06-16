@@ -123,7 +123,7 @@ if models is not None:
     # Sélection du modèle
     selected_model = st.selectbox(
         "Sélectionnez le modèle à utiliser:",
-        list(models.keys())
+        list(models.keys()),
         key="model_simple"
 
     )
@@ -201,7 +201,7 @@ if models is not None:
                 # Sélection du modèle
                 selected_model = st.selectbox(
                     "Sélectionnez le modèle à utiliser:",
-                    list(models.keys())
+                    list(models.keys()),
                     key="model_batch"  
                     
                 )
