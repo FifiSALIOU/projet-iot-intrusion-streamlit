@@ -167,9 +167,9 @@ if models is not None:
                     ax.text(i, v + 0.02, f'{v:.2%}', ha='center', va='bottom')
                 st.pyplot(fig)
 
-    elif option == "📊 Prédiction par Batch":
+     elif option == "📊 Prédiction par Batch":
         st.header("📊 Analyse de Fichier CSV")
-        st.markdown("Uploadez un fichier CSV pour analyser plusieurs échantillons.")
+        st.markdown("Choisissez un fichier CSV local ou uploadez un fichier CSV pour analyser plusieurs échantillons.")
         
         # Information sur le format attendu
         with st.expander("ℹ️ Format de fichier requis"):
@@ -177,91 +177,102 @@ if models is not None:
             st.write(", ".join(N_BAIOT_FEATURES))
             st.write("Exemple de fichier: [Télécharger un exemple](https://example.com/sample.csv)")
         
-        uploaded_file = st.file_uploader("Choisissez un fichier CSV", type="csv")
+        # Liste des fichiers CSV présents dans le dossier courant
+        files_dispo = [f for f in os.listdir() if f.endswith(".csv")]
+        selected_local_file = st.selectbox("Ou choisissez un fichier CSV local disponible:", files_dispo)
         
+        uploaded_file = st.file_uploader("Ou uploadez un fichier CSV", type="csv")
+        
+        df = None
         if uploaded_file is not None:
             try:
                 df = pd.read_csv(uploaded_file)
-                st.success(f"✅ Fichier chargé: {df.shape[0]} lignes, {df.shape[1]} colonnes")
-                
-                # Vérification des colonnes
-                if set(N_BAIOT_FEATURES).issubset(set(df.columns)):
-                    # Sélection du modèle
-                    selected_model = st.selectbox(
-                        "Sélectionnez le modèle à utiliser:",
-                        list(models.keys())
-                    )
-                    model = models[selected_model]
-                    
-                    if st.button("🔍 Analyser le fichier", type="primary"):
-                        # Préparation des données
-                        X = df[N_BAIOT_FEATURES]
-                        X_scaled = scaler.transform(X)
-                        
-                        # Prédictions
-                        predictions = model.predict(X_scaled)
-                        probabilities = model.predict_proba(X_scaled)
-                        
-                        # Ajout des résultats au DataFrame
-                        df['Prédiction'] = predictions
-                        df['Probabilité_Normal'] = probabilities[:, 0]
-                        df['Probabilité_Intrusion'] = probabilities[:, 1]
-                        df['Statut'] = df['Prédiction'].map({0: 'Normal', 1: 'Intrusion'})
-                        
-                        # Statistiques
-                        st.subheader("📈 Résultats de l'Analyse")
-                        col1, col2, col3 = st.columns(3)
-                        
-                        with col1:
-                            total = len(df)
-                            st.metric("Total Échantillons", total)
-                        
-                        with col2:
-                            normal_count = sum(predictions == 0)
-                            st.metric("Trafic Normal", f"{normal_count} ({normal_count/total*100:.1f}%)")
-                        
-                        with col3:
-                            intrusion_count = sum(predictions == 1)
-                            st.metric("Intrusions Détectées", f"{intrusion_count} ({intrusion_count/total*100:.1f}%)")
-                        
-                        # Graphiques
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            fig, ax = plt.subplots(figsize=(8, 6))
-                            df['Statut'].value_counts().plot(kind='pie', ax=ax, autopct='%1.1f%%', 
-                                                           colors=['#2E8B57', '#DC143C'])
-                            ax.set_title('Distribution des Prédictions')
-                            st.pyplot(fig)
-                        
-                        with col2:
-                            fig, ax = plt.subplots(figsize=(8, 6))
-                            ax.hist(df['Probabilité_Intrusion'], bins=20, alpha=0.7, color='orange')
-                            ax.set_xlabel('Probabilité d\'Intrusion')
-                            ax.set_ylabel('Fréquence')
-                            ax.set_title('Distribution des Probabilités d\'Intrusion')
-                            st.pyplot(fig)
-                        
-                        # Affichage des résultats détaillés
-                        st.subheader("📋 Résultats Détaillés")
-                        st.dataframe(df[['Statut', 'Probabilité_Normal', 'Probabilité_Intrusion'] + N_BAIOT_FEATURES])
-                        
-                        # Téléchargement des résultats
-                        csv = df.to_csv(index=False)
-                        st.download_button(
-                            label="💾 Télécharger les résultats",
-                            data=csv,
-                            file_name="resultats_analyse.csv",
-                            mime="text/csv"
-                        )
-                        
-                else:
-                    st.error("❌ Le fichier ne contient pas les colonnes requises.")
-                    st.write("Colonnes requises:", N_BAIOT_FEATURES)
-                    st.write("Colonnes trouvées:", list(df.columns))
-                    
+                st.success(f"✅ Fichier chargé via upload : {df.shape[0]} lignes, {df.shape[1]} colonnes")
             except Exception as e:
-                st.error(f"❌ Erreur lors du chargement du fichier: {str(e)}")
+                st.error(f"Erreur lors du chargement du fichier uploadé: {e}")
+        elif selected_local_file:
+            try:
+                df = pd.read_csv(selected_local_file)
+                st.success(f"✅ Fichier local chargé : {df.shape[0]} lignes, {df.shape[1]} colonnes")
+            except Exception as e:
+                st.error(f"Erreur lors du chargement du fichier local: {e}")
+        
+        if df is not None:
+            # Vérification des colonnes
+            if set(N_BAIOT_FEATURES).issubset(set(df.columns)):
+                # Sélection du modèle
+                selected_model = st.selectbox(
+                    "Sélectionnez le modèle à utiliser:",
+                    list(models.keys())
+                )
+                model = models[selected_model]
+                
+                if st.button("🔍 Analyser le fichier", type="primary"):
+                    # Préparation des données
+                    X = df[N_BAIOT_FEATURES]
+                    X_scaled = scaler.transform(X)
+                    
+                    # Prédictions
+                    predictions = model.predict(X_scaled)
+                    probabilities = model.predict_proba(X_scaled)
+                    
+                    # Ajout des résultats au DataFrame
+                    df['Prédiction'] = predictions
+                    df['Probabilité_Normal'] = probabilities[:, 0]
+                    df['Probabilité_Intrusion'] = probabilities[:, 1]
+                    df['Statut'] = df['Prédiction'].map({0: 'Normal', 1: 'Intrusion'})
+                    
+                    # Statistiques
+                    st.subheader("📈 Résultats de l'Analyse")
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        total = len(df)
+                        st.metric("Total Échantillons", total)
+                    
+                    with col2:
+                        normal_count = sum(predictions == 0)
+                        st.metric("Trafic Normal", f"{normal_count} ({normal_count/total*100:.1f}%)")
+                    
+                    with col3:
+                        intrusion_count = sum(predictions == 1)
+                        st.metric("Intrusions Détectées", f"{intrusion_count} ({intrusion_count/total*100:.1f}%)")
+                    
+                    # Graphiques
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        df['Statut'].value_counts().plot(kind='pie', ax=ax, autopct='%1.1f%%', 
+                                                       colors=['#2E8B57', '#DC143C'])
+                        ax.set_title('Distribution des Prédictions')
+                        st.pyplot(fig)
+                    
+                    with col2:
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        ax.hist(df['Probabilité_Intrusion'], bins=20, alpha=0.7, color='orange')
+                        ax.set_xlabel('Probabilité d\'Intrusion')
+                        ax.set_ylabel('Fréquence')
+                        ax.set_title('Distribution des Probabilités d\'Intrusion')
+                        st.pyplot(fig)
+                    
+                    # Affichage des résultats détaillés
+                    st.subheader("📋 Résultats Détaillés")
+                    st.dataframe(df[['Statut', 'Probabilité_Normal', 'Probabilité_Intrusion'] + N_BAIOT_FEATURES])
+                    
+                    # Téléchargement des résultats
+                    csv = df.to_csv(index=False)
+                    st.download_button(
+                        label="💾 Télécharger les résultats",
+                        data=csv,
+                        file_name="resultats_analyse.csv",
+                        mime="text/csv"
+                    )
+                    
+            else:
+                st.error("❌ Le fichier ne contient pas les colonnes requises.")
+                st.write("Colonnes requises:", N_BAIOT_FEATURES)
+                st.write("Colonnes trouvées:", list(df.columns))
 
     elif option == "📈 Statistiques des Modèles":
         st.header("📈 Informations sur les Modèles")
