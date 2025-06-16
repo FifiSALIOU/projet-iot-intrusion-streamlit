@@ -177,7 +177,8 @@ if models is not None:
             st.write(", ".join(N_BAIOT_FEATURES))
             st.write("Exemple de fichier: [Télécharger un exemple](https://example.com/sample.csv)")
         
-        uploaded_file = st.file_uploader("Choisissez un fichier CSV", type="csv")
+        uploaded_file = st.file_uploader("📁 Choisissez un fichier CSV", type="csv", key="batch_csv_uploader")
+
         
         if uploaded_file is not None:
             try:
