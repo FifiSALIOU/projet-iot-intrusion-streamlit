@@ -88,86 +88,80 @@ if models is not None:
     }
 
     if option == "🔍 Prédiction Simple":
-        st.header("🔍 Prédiction pour un Échantillon")
-
+    st.header("🔍 Prédiction pour un Échantillon")
     st.markdown("Saisissez les caractéristiques du trafic réseau pour détecter une intrusion.")
 
-        # Création de colonnes pour l'interface
-        col1, col2 = st.columns(2)
-        
-        input_data = {}
-        
-        with col1:
-            st.subheader("📡 Caractéristiques du Trafic")
-            for i in range(5):
-                feat = N_BAIOT_FEATURES[i]
-                input_data[feat] = st.number_input(
-                    label=feat,
-                    min_value=0.0,
-                    value=DEFAULT_VALUES[feat],
-                    step=0.01,
-                    format="%.4f"
-                )
-        
-        with col2:
-            st.subheader("")
-            for i in range(5, len(N_BAIOT_FEATURES)):
-                feat = N_BAIOT_FEATURES[i]
-                input_data[feat] = st.number_input(
-                    label=feat,
-                    min_value=0.0,
-                    value=DEFAULT_VALUES[feat],
-                    step=0.01,
-                    format="%.4f"
-                )
-            
-        # Sélection du modèle
-        selected_model = st.selectbox(
-            "Sélectionnez le modèle à utiliser:",
-            list(models.keys())
-        )
-        model = models[selected_model]
-        
-        # Bouton de prédiction
-        if st.button("🔍 Analyser", type="primary"):
-            # Création du vecteur de caractéristiques
-            input_array = np.array([[input_data[feat] for feat in N_BAIOT_FEATURES]])
-            
-            # Normalisation
-            input_scaled = scaler.transform(input_array)
-            
-            # Prédiction
-            prediction = model.predict(input_scaled)[0]
-            probability = model.predict_proba(input_scaled)[0]
-            
-            # Affichage des résultats
-            st.markdown("---")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if prediction == 1:
-                    st.error("🚨 **INTRUSION DÉTECTÉE**")
-                    st.markdown("⚠️ Trafic malveillant identifié")
-                else:
-                    st.success("✅ **TRAFIC NORMAL**")
-                    st.markdown("🔒 Aucune menace détectée")
-            
-            with col2:
-                st.metric("Probabilité Normal", f"{probability[0]:.2%}")
-                st.metric("Probabilité Intrusion", f"{probability[1]:.2%}")
-            
-            with col3:
-                # Graphique de probabilité
-                fig, ax = plt.subplots(figsize=(6, 4))
-                labels = ['Normal', 'Intrusion']
-                colors = ['#2E8B57', '#DC143C']
-                ax.bar(labels, probability, color=colors, alpha=0.7)
-                ax.set_ylabel('Probabilité')
-                ax.set_title(f'Probabilités de Classification ({selected_model})')
-                ax.set_ylim(0, 1)
-                for i, v in enumerate(probability):
-                    ax.text(i, v + 0.02, f'{v:.2%}', ha='center', va='bottom')
-                st.pyplot(fig)
+    # Création de colonnes pour l'interface
+    col1, col2 = st.columns(2)
+
+    input_data = {}
+
+    with col1:
+        st.subheader("📡 Caractéristiques du Trafic")
+        for i in range(5):
+            feat = N_BAIOT_FEATURES[i]
+            input_data[feat] = st.number_input(
+                label=feat,
+                min_value=0.0,
+                value=DEFAULT_VALUES[feat],
+                step=0.01,
+                format="%.4f"
+            )
+
+    with col2:
+        st.subheader("")
+        for i in range(5, len(N_BAIOT_FEATURES)):
+            feat = N_BAIOT_FEATURES[i]
+            input_data[feat] = st.number_input(
+                label=feat,
+                min_value=0.0,
+                value=DEFAULT_VALUES[feat],
+                step=0.01,
+                format="%.4f"
+            )
+
+    # Sélection du modèle
+    selected_model = st.selectbox(
+        "Sélectionnez le modèle à utiliser:",
+        list(models.keys())
+    )
+    model = models[selected_model]
+
+    # Bouton de prédiction
+    if st.button("🔍 Analyser", type="primary"):
+        input_array = np.array([[input_data[feat] for feat in N_BAIOT_FEATURES]])
+        input_scaled = scaler.transform(input_array)
+        prediction = model.predict(input_scaled)[0]
+        probability = model.predict_proba(input_scaled)[0]
+
+        st.markdown("---")
+        st.write("### 🧪 Données saisies")
+        st.json(input_data)
+
+        st.write("### 📊 Probabilités de prédiction")
+        st.write(f"- Probabilité **Normal** : `{probability[0]:.4f}`")
+        st.write(f"- Probabilité **Intrusion** : `{probability[1]:.4f}`")
+
+        # Résultat
+        if prediction == 1:
+            st.error("🚨 **INTRUSION DÉTECTÉE**")
+            st.markdown("⚠️ Trafic malveillant identifié")
+        else:
+            st.success("✅ **TRAFIC NORMAL**")
+            st.markdown("🔒 Aucune menace détectée")
+
+        # Graphique
+        fig, ax = plt.subplots(figsize=(6, 4))
+        labels = ['Normal', 'Intrusion']
+        colors = ['#2E8B57', '#DC143C']
+        ax.bar(labels, probability, color=colors, alpha=0.7)
+        ax.set_ylabel('Probabilité')
+        ax.set_title(f'Probabilités de Classification ({selected_model})')
+        ax.set_ylim(0, 1)
+        for i, v in enumerate(probability):
+            ax.text(i, v + 0.02, f'{v:.2%}', ha='center', va='bottom')
+        st.pyplot(fig)
+
 
     elif option == "📊 Prédiction par Batch":
         st.header("📊 Analyse de Fichier CSV")
