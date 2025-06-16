@@ -168,8 +168,8 @@ if models is not None:
                 st.pyplot(fig)
 
         elif option == "📊 Prédiction par Batch":
-        st.header("📊 Analyse de Fichier CSV")
-        st.markdown("Uploadez un fichier CSV pour analyser plusieurs échantillons.")
+            st.header("📊 Analyse de Fichier CSV")
+            st.markdown("Uploadez un fichier CSV pour analyser plusieurs échantillons.")
         
         # Info sur le format
         with st.expander("ℹ️ Format de fichier requis", expanded=False):
