@@ -89,8 +89,9 @@ if models is not None:
 
     if option == "🔍 Prédiction Simple":
         st.header("🔍 Prédiction pour un Échantillon")
-        st.markdown("Saisissez les caractéristiques du trafic réseau pour détecter une intrusion.")
-        
+
+    st.markdown("Saisissez les caractéristiques du trafic réseau pour détecter une intrusion.")
+
         # Création de colonnes pour l'interface
         col1, col2 = st.columns(2)
         
