@@ -266,39 +266,35 @@ if models is not None:
             except Exception as e:
                 st.error(f"❌ Erreur lors du chargement du fichier: {str(e)}")
 
-    elif option == "📈 Statistiques des Modèles":
-        st.header("📈 Informations sur les Modèles")
-        
-        # Afficher les statistiques pour chaque modèle
-        for model_name, model in models.items():
-            st.subheader(f"🤖 Modèle: {model_name}")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write(f"**Type de modèle:** {type(model).__name__}")
-                
-                # Afficher les paramètres spécifiques au modèle
-                if hasattr(model, 'get_params'):
-                    params = model.get_params()
-                    st.write("**Paramètres:**")
-                    for key, value in list(params.items())[:5]:  # Afficher les 5 premiers
-                        st.text(f"{key}: {value}")
-            
             with col2:
-                # Importance des features (si disponible)
-                if hasattr(model, 'feature_importances_'):
-                    st.subheader("🎯 Importance des Features")
-                    
-                    importance_df = pd.DataFrame({
-                        'Feature': features,
-                        'Importance': model.feature_importances_
-                    }).sort_values('Importance', ascending=False)
-                    
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.barplot(data=importance_df.head(10), x='Importance', y='Feature', ax=ax)
-                    ax.set_title('Top 10 des Features Importantes')
-                    st.pyplot(fig)
+            # Importance des features selon le modèle
+            if hasattr(model, 'feature_importances_'):
+                st.subheader("🎯 Importance des Features")
+                importance_df = pd.DataFrame({
+                    'Feature': features,
+                    'Importance': model.feature_importances_
+                }).sort_values('Importance', ascending=False)
+
+                fig, ax = plt.subplots(figsize=(10, 6))
+                sns.barplot(data=importance_df.head(10), x='Importance', y='Feature', ax=ax)
+                ax.set_title('Top 10 des Features Importantes')
+                st.pyplot(fig)
+
+            elif hasattr(model, 'coef_'):
+                st.subheader("🎯 Importance des Features (basée sur les coefficients)")
+                importance_df = pd.DataFrame({
+                    'Feature': features,
+                    'Importance': np.abs(model.coef_[0])
+                }).sort_values('Importance', ascending=False)
+
+                fig, ax = plt.subplots(figsize=(10, 6))
+                sns.barplot(data=importance_df.head(10), x='Importance', y='Feature', ax=ax)
+                ax.set_title('Top 10 des Features Importantes')
+                st.pyplot(fig)
+
+            else:
+                st.info("ℹ️ Ce modèle ne fournit pas directement d'information sur l'importance des features.")
+
             
             st.markdown("---")
 
