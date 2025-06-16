@@ -27,10 +27,8 @@ print("\n🔍 Téléchargement et prétraitement du dataset N-BaIoT...")
 DATASET_URL = "https://www.kaggle.com/datasets/mkashifn/nbaiot-Dataset"
 FILES = [
     "1.benign.csv",
-    "4.mirai.scan.csv",
-    "4.mirai.ack.csv",
-    "4.mirai.syn.csv",
-    "4.mirai.udp.csv",
+    "1.mirai.scan.csv",
+    "1.mirai.ack.csv",
     "4.gafgyt.udp.csv"
 ]
 
