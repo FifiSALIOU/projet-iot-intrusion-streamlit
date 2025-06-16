@@ -1,4 +1,6 @@
 import streamlit as st
+st.write(st.config.get_option("server.maxUploadSize"))
+import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
