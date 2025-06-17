@@ -86,7 +86,7 @@ if models:
                 feat = N_BAIOT_FEATURES[i]
                 input_data[feat] = st.number_input(feat, 0.0, value=DEFAULT_VALUES[feat], step=0.01, format="%.4f")
 
-        selected_model = st.selectbox("Sélectionnez le modèle à utiliser:", list(models.keys()))
+        selected_model = st.selectbox("Sélectionnez le modèle à utiliser:", list(models.keys()), key="simple_model")
         model = models[selected_model]
 
         if st.button("🔍 Analyser", type="primary"):
@@ -127,7 +127,7 @@ if models:
                 df = pd.read_csv(uploaded_file)
                 st.success(f"✅ {df.shape[0]} lignes, {df.shape[1]} colonnes chargées.")
                 if set(N_BAIOT_FEATURES).issubset(df.columns):
-                    selected_model = st.selectbox("Sélectionnez le modèle à utiliser:", list(models.keys()))
+                    selected_model = st.selectbox("Sélectionnez le modèle à utiliser:", list(models.keys()), key="batch_model")
                     model = models[selected_model]
 
                     if st.button("🔍 Analyser le fichier", type="primary"):
